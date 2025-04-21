@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Billboard Top 100 1958–2025</title>
+  <script src="https://unpkg.com/htmx.org@2"></script>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: sans-serif;
+      font-size: 0.95rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-top: 1rem;
+    }
+
+    thead {
+      background: #f5f5f5;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th, td {
+      padding: 0.75em 1em;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: left;
+    }
+
+    tr:hover td {
+      background-color: #f0f8ff;
+    }
+
+    th {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .sort-icon {
+      margin-left: 4px;
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #fafafa;
+    }
+
+    th.sorted-column {
+      background: #e8f0ff;
+      color: #003399;
+    }
+
+    .filter-fade {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+    }
+
+    .filter-fade.active {
+      display: inline-block;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  tr.htmx-added {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+</style>
+</head>
+<body>
+
+<h1>Billboard Top 100 1958–2025</h1>
+
+<form id="filters"
+      hx-get="/songs"
+      hx-trigger="load, keyup changed delay:500ms from:input"
+      hx-target="#songs"
+      hx-swap="innerHTML">
+  <input type="text" name="artist" placeholder="Search by Artist">
+  <input type="text" name="query" placeholder="Search by Song name">
+  <input type="text" name="year" placeholder="Debut Year">
+  <input type="text" name="peak" placeholder="Peak position on chart">
+  <input type="hidden" name="page" value="1">
+
+  <button id="clear-filters" type="button"
+          onclick="clearFilters()"
+          class="filter-fade"
+          style="display: none;">
+    Clear Filters
+  </button>
+</form>
+
+<div>
+  Showing <span id="result-count"
+                hx-get="/songs/count"
+                hx-include="#filters"
+                hx-trigger="load, keyup changed delay:500ms from:input, refresh"
+                hx-swap="innerHTML">...</span> results
+</div>
+
+<table id="songs-table" border="1">
+  <thead>
+    <tr>
+      <th onclick="sortTable(0)">Song <span class="sort-icon" data-col="0"></span></th>
+      <th onclick="sortTable(1)">Artist <span class="sort-icon" data-col="1"></span></th>
+      <th onclick="sortTable(2)">First Date <span class="sort-icon" data-col="2"></span></th>
+      <th onclick="sortTable(3)">Peak Pos <span class="sort-icon" data-col="3"></span></th>
+      <th onclick="sortTable(4)">Peak Date <span class="sort-icon" data-col="4"></span></th>
+      <th onclick="sortTable(5)">Weeks <span class="sort-icon" data-col="5"></span></th>
+      <th>Thumbnail</th>
+      <th>Lyrics</th>
+    </tr>
+  </thead>
+  <tbody id="songs">
+    <!-- dynamic rows go here -->
+  </tbody>
+</table>
+
+<div id="infinite-scroll-marker"></div>
+
+<script>
+  let loading = false;
+  document.addEventListener('scroll', () => {
+    if (loading) return;
+    const sentinel = document.getElementById('load-more');
+    if (!sentinel) return;
+
+    if (sentinel.getBoundingClientRect().top < window.innerHeight + 100) {
+      loading = true;
+      const nextPage = sentinel.dataset.nextPage;
+
+      const artist = document.querySelector('input[name="artist"]').value;
+      const query = document.querySelector('input[name="query"]').value;
+      const year = document.querySelector('input[name="year"]').value;
+      const peak = document.querySelector('input[name="peak"]').value;
+
+      const url = `/songs?page=${nextPage}&query=${encodeURIComponent(query)}&year=${encodeURIComponent(year)}&artist=${encodeURIComponent(artist)}&peak=${encodeURIComponent(peak)}`;
+      htmx.ajax('GET', url, {
+        target: '#songs',
+        swap: 'beforeend'
+      }).finally(() => loading = false);
+
+      sentinel.remove();
+    }
+  });
+
+  window.sortedColumn = null;
+  window.sortDirection = 'asc';
+
+  function sortTable(colIndex) {
+    const table = document.getElementById("songs-table");
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"))
+      .filter(row => row.id !== "load-more-row" && row.cells.length > colIndex);
+
+    if (rows.length === 0) return;
+
+    const isNumber = !isNaN(rows[0].cells[colIndex].innerText);
+    const isSameCol = window.sortedColumn === colIndex;
+    const newDirection = isSameCol && window.sortDirection === 'asc' ? 'desc' : 'asc';
+
+    rows.sort((a, b) => {
+      const aText = a.cells[colIndex].innerText.trim();
+      const bText = b.cells[colIndex].innerText.trim();
+
+      if (isNumber) {
+        return (newDirection === 'asc' ? 1 : -1) * (Number(aText) - Number(bText));
+      } else {
+        return (newDirection === 'asc' ? 1 : -1) * aText.localeCompare(bText);
+      }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+    window.sortedColumn = colIndex;
+    window.sortDirection = newDirection;
+
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+      const iconCol = parseInt(icon.dataset.col);
+      icon.textContent = iconCol === colIndex ? (newDirection === 'asc' ? '▲' : '▼') : '';
+    });
+
+    document.querySelectorAll("thead th").forEach(th => th.classList.remove("sorted-column"));
+    document.querySelector(`thead th:nth-child(${colIndex + 1})`).classList.add("sorted-column");
+  }
+
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    // remove loading row if present
+    const loadingRow = document.getElementById('loading-row');
+    if (loadingRow) loadingRow.remove();
+    if (window.sortedColumn !== null) {
+      sortTable(window.sortedColumn);
+    }
+  });
+
+  function clearFilters() {
+    const form = document.getElementById('filters');
+    form.querySelectorAll('input[type=text]').forEach(input => input.value = '');
+    form.querySelector('input[name=page]').value = '1';
+    htmx.trigger(form, 'submit');
+    htmx.trigger(document.getElementById('result-count'), 'refresh');
+    updateClearButton();
+  }
+
+  function updateClearButton() {
+    const form = document.getElementById('filters');
+    const clearBtn = document.getElementById('clear-filters');
+
+    const hasActiveFilter = Array.from(form.querySelectorAll('input[type=text]'))
+      .some(input => input.value.trim() !== '');
+
+    if (hasActiveFilter) {
+      clearBtn.classList.add('active');
+      clearBtn.style.display = 'inline-block';
+    } else {
+      clearBtn.classList.remove('active');
+      setTimeout(() => {
+        if (!clearBtn.classList.contains('active')) {
+          clearBtn.style.display = 'none';
+        }
+      }, 300);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#filters input[type=text]')
+      .forEach(input => input.addEventListener('input', updateClearButton));
+    updateClearButton();
+  });
+</script>
+
+</body>
+</html>

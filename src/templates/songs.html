@@ -1,0 +1,36 @@
+{% for song in songs %}
+<tr>
+  <td>{{ song['song'] }}</td>
+  <td>{{ song['artist'] }}</td>
+  <td>{{ song['first_date'] }}</td>
+  <td>{{ song['peak_position'] }}</td>
+  <td>{{ song['peak_date'] }}</td>
+  <td>{{ song['weeks_on_chart'] }}</td>
+  <td>
+    <div hx-get="/thumbnail?song={{ song.song | urlencode }}&artist={{ song.artist | urlencode }}"
+         hx-trigger="revealed"
+         hx-target="this"
+         hx-swap="outerHTML"
+         style="width: 120px; height: 90px; background: #ddd;">
+    </div>
+  </td>
+  <td>
+    <a href="https://www.google.com/search?q={{ song.song | urlencode }}+{{ song.artist | urlencode }}+lyrics"
+       target="_blank" rel="noopener">
+      🔗 Lyrics
+    </a>
+  </td>
+</tr>
+{% endfor %}
+
+{% if has_more %}
+<tr id="load-more-row">
+  <td colspan="7" style="text-align: center;">
+    <div id="load-more" data-next-page="{{ next_page }}"><em>Loading more...</em></div>
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="7" style="text-align: center; color: #888;"><em>No more results</em></td>
+</tr>
+{% endif %}

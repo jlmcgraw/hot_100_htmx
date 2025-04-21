@@ -1,0 +1,7 @@
+{% if thumbnail_url and video_url %}
+  <a href="{{ video_url }}" target="_blank" rel="noopener">
+    <img src="{{ thumbnail_url }}" loading="lazy" width="120" height="90" style="border-radius: 8px;">
+  </a>
+{% else %}
+  <div style="width: 120px; height: 90px; background: #aaa;">No video</div>
+{% endif %}
