@@ -21,7 +21,7 @@ import requests
 from flask import Flask, render_template, request, g
 
 app = Flask(__name__)
-DATABASE = "data/hot_100.db"
+DATABASE = "data/hot_100.sqlite"
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
 

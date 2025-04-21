@@ -79,6 +79,7 @@ def aggregate_song_stats(charts: List[Chart]) -> Dict[Tuple[str, str], SongStats
 
 def create_database(db_path: Path) -> sqlite3.Connection:
     logger.info(f"Creating SQLite database at {db_path}")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS songs")
@@ -120,13 +121,13 @@ def parse_args():
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("../all.json"),
+        default=Path("all.json"),
         help="Path to input JSON file (default: all.json)"
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("../data/hot_100.db"),
+        default=Path("hot_100.sqlite"),
         help="Path to output SQLite database file (default: hot_100.db)"
     )
     return parser.parse_args()
