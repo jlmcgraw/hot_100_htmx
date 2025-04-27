@@ -46,33 +46,65 @@ YOUTUBE_SEARCH_URL = "https://www.youtube.com/results?search_query="
 
 @lru_cache(maxsize=512)
 def get_youtube_info(query: str) -> dict:
-    try:
-        search_url = YOUTUBE_SEARCH_URL + quote_plus(query)
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(search_url, headers=headers, timeout=5)
+    """
+    Scrapes YouTube's search page to get the first video's thumbnail,
+    but links to the YouTube search results page instead of the specific video.
 
-        match = re.search(
-            r"var ytInitialData = ({.*?});</script>", response.text, re.DOTALL
-        )
+    Args:
+        query (str): The search term (e.g. song title + artist)
+
+    Returns:
+        dict: A dictionary with 'thumbnail_url' and 'search_url', or empty dict if not found.
+    """
+    try:
+        # Construct search URL
+        search_url = YOUTUBE_SEARCH_URL + quote_plus(query)
+
+        # Use realistic headers
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            )
+        }
+
+        # Fetch HTML content
+        response = requests.get(search_url, headers=headers, timeout=5)
+        response.raise_for_status()
+
+        # Look for the ytInitialData JSON blob
+        match = re.search(r"var ytInitialData = ({.*?});</script>", response.text, re.DOTALL)
         if not match:
             return {}
 
         yt_json = match.group(1)
         data = json.loads(yt_json)
 
-        contents = data["contents"]["twoColumnSearchResultsRenderer"][
-            "primaryContents"
-        ]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"]
+        # Traverse to find the first video thumbnail
+        contents = (
+            data.get("contents", {})
+                .get("twoColumnSearchResultsRenderer", {})
+                .get("primaryContents", {})
+                .get("sectionListRenderer", {})
+                .get("contents", [{}])[0]
+                .get("itemSectionRenderer", {})
+                .get("contents", [])
+        )
 
-        for video in contents:
-            if "videoRenderer" in video:
-                video_id = video["videoRenderer"]["videoId"]
+        for item in contents:
+            video = item.get("videoRenderer")
+            if video and "videoId" in video:
+                video_id = video["videoId"]
+                thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                 return {
-                    "thumbnail_url": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-                    "video_url": f"https://www.youtube.com/watch?v={video_id}",
+                    "thumbnail_url": thumbnail_url,
+                    "search_url": search_url,  # ✅ link to full search page
                 }
-    except Exception as e:
-        print(f"[ERROR] YouTube lookup failed for '{query}': {e}")
+
+    except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
+        print(f"[YT ERROR] Failed to look up '{query}': {type(e).__name__}: {e}")
+
     return {}
 
 
@@ -209,21 +241,26 @@ def songs_count():
 
     return str(total)
 
-@app.route("/thumbnail")
-def thumbnail() -> str:
-    song = request.args.get("song")
-    artist = request.args.get("artist")
+@app.route('/thumbnail')
+def thumbnail():
+    song = request.args.get('song', '')
+    artist = request.args.get('artist', '')
+    query = f"{artist} {song}"
 
-    if not song or not artist:
-        return "", 400
+    info = get_youtube_info(query)
 
-    yt = get_youtube_info(f"{artist} {song}")
+    if not info:
+        return '<div style="width:120px; height:90px; background:#ccc;"></div>'
 
-    return render_template(
-        "thumbnail.html",
-        thumbnail_url=yt.get("thumbnail_url"),
-        video_url=yt.get("video_url"),
-    )
+    thumbnail_url = info['thumbnail_url']
+    search_url = info['search_url']
+
+    return f'''
+    <a href="{search_url}" target="_blank" rel="noopener">
+      <img src="{thumbnail_url}" alt="YouTube Thumbnail" style="width:120px; height:90px;">
+    </a>
+    '''
+
 
 
 if __name__ == "__main__":

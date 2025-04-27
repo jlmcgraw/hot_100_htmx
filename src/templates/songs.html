@@ -7,21 +7,29 @@
   <td>{{ song['peak_date'] }}</td>
   <td>{{ song['weeks_on_chart'] }}</td>
   <td>
-    <div hx-get="/thumbnail?song={{ song.song | urlencode }}&artist={{ song.artist | urlencode }}"
-         hx-trigger="revealed"
-         hx-target="this"
-         hx-swap="outerHTML"
-         style="width: 120px; height: 90px; background: #ddd;">
-    </div>
+    <a hx-get="/thumbnail?song={{ song.song | urlencode }}&artist={{ song.artist | urlencode }}"
+       hx-trigger="revealed"
+       hx-target="this"
+       hx-swap="outerHTML"
+       style="display: block; width: 120px; height: 90px; background: #ddd;">
+      <!-- Placeholder will be replaced with a <img> inside <a> -->
+    </a>
   </td>
   <td>
     <a href="https://www.google.com/search?q={{ song.song | urlencode }}+{{ song.artist | urlencode }}+lyrics"
        target="_blank" rel="noopener">
-      🔗 Lyrics
+       Lyrics
+    </a>
+  </td>
+    <td>
+    <a href="https://en.wikipedia.org/w/index.php?title=Special:Search&search={{ song.artist | urlencode }}+{{ song.song | urlencode }}"
+       target="_blank" rel="noopener">
+       Wikipedia
     </a>
   </td>
 </tr>
 {% endfor %}
+
 
 {% if has_more %}
 <tr id="load-more-row">
