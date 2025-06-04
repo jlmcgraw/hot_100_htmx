@@ -128,7 +128,7 @@ def parse_args():
         "--output",
         type=Path,
         default=Path("hot_100.sqlite"),
-        help="Path to output SQLite database file (default: hot_100.db)"
+        help="Path to output SQLite database file (default: hot_100.sqlite)"
     )
     return parser.parse_args()
 
